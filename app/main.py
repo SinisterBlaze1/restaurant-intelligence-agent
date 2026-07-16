@@ -180,3 +180,16 @@ def ai_search(body: NLQuery):
         error_detail = traceback.format_exc()
         print("FULL ERROR:", error_detail)
         return {"error": str(e), "traceback": error_detail}
+
+class AgentQuery(BaseModel):
+    query: str
+
+@app.post("/agent")
+def agent_search(body: AgentQuery):
+    try:
+        from app.agent import run_agent
+        result = run_agent(body.query)
+        return {"query": body.query, "recommendation": result}
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "detail": traceback.format_exc()}

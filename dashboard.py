@@ -202,4 +202,53 @@ if st.button("Ask AI", type="primary"):
     else:
         st.warning("Please type something first.")
 
+st.divider()
+st.subheader("🧠 AI Agent — Full Recommendation")
+st.caption("The agent searches, reads reviews, and reasons — not just filters")
+
+agent_query = st.text_input(
+    "Ask the agent anything",
+    placeholder="e.g. Best place for a date night under ₹2000 in Indiranagar",
+    key="agent_input"
+)
+
+if st.button("Ask Agent", type="primary", key="agent_btn"):
+    if agent_query.strip():
+        with st.spinner("Agent is thinking — searching, reading reviews, reasoning..."):
+            try:
+                response = requests.post(
+                    f"{BASE_URL}/agent",
+                    json={"query": agent_query},
+                    timeout=120
+                ).json()
+
+                if "error" in response:
+                    error_msg = response["error"]
+                    if "rate_limit" in error_msg or "429" in error_msg:
+                        st.warning("⏳ Groq rate limit reached. Wait 10 minutes and try again — you've used today's free token quota.")
+                    else:
+                        st.error(f"Agent error: {error_msg[:200]}")
+                else:
+                    recommendation = response.get("recommendation", "")
+                    if recommendation and len(recommendation) > 20:
+                        st.markdown("### 🍽️ Agent's Recommendation")
+                        lines = [
+                            l.strip() for l in recommendation.strip().split('\n')
+                            if l.strip() and not set(l.strip()).issubset({'─', '-', ' '})
+                        ]
+                        for line in lines:
+                            if "RECOMMENDATION:" in line:
+                                name = line.replace("🍽️ RECOMMENDATION:", "").replace("RECOMMENDATION:", "").strip()
+                                st.markdown(f"## {name}")
+                            else:
+                                st.markdown(line)
+                    else:
+                        st.warning("Agent returned an empty response. Try again.")
+            except requests.exceptions.Timeout:
+                st.warning("⏳ Agent timed out. The model is slow on free tier — try again.")
+            except Exception as e:
+                st.error(f"Connection error: {str(e)}")
+    else:
+        st.warning("Please type something first.")
+
 st.caption("Built by Shivansh · Restaurant Intelligence Agent · Phase 3 of 5")
