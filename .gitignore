@@ -1,3 +1,4 @@
 zomato.csv
 *.csv
 venv/
+.env
