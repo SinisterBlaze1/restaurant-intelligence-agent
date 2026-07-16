@@ -118,48 +118,65 @@ def top_locations():
         rows = result.mappings().all()
     return [dict(row) for row in rows]
 
-@app.post("/api/ai-search") # Or whatever your exact decorator route is right above it
+@app.post("/ai-search")
 def ai_search(body: NLQuery):
-    filters = extract_filters(body.query)
+    import traceback
+    try:
+        filters = extract_filters(body.query)
 
-    params = {
-        "min_rating": filters.get("min_rating") or 3.5,
-        "max_cost": filters.get("max_cost") or 2000,
-        "limit": 10
-    }
-    
-    if filters.get("cuisine"):
-        params["cuisine"] = filters["cuisine"]
-    if filters.get("location"):
-        params["location"] = filters["location"]
-    if filters.get("online_order") is not None:
-        params["online_order"] = filters["online_order"]
+        params = {
+            "min_rating": filters.get("min_rating") or 3.5,
+            "max_cost": filters.get("max_cost") or 2000,
+            "limit": 10
+        }
 
-    cuisine_filter = "AND cuisines ILIKE :cuisine" if params.get("cuisine") else ""
-    location_filter = "AND location ILIKE :location" if params.get("location") else ""
-    online_filter = "AND online_order = :online_order" if params.get("online_order") is not None else ""
+        if filters.get("cuisine"):
+            params["cuisine"] = f"%{filters['cuisine']}%"
+        if filters.get("location"):
+            params["location"] = f"%{filters['location']}%"
+        if filters.get("online_order") is not None:
+            params["online_order"] = filters["online_order"]
 
-    query = text(f"""
-    SELECT DISTINCT ON (name, location)
-         name, location, cuisines, rate, approx_cost, votes, online_order
-        FROM restaurants
-        WHERE rate IS NOT NULL 
-          AND approx_cost IS NOT NULL
-          AND rate >= :min_rating
-          AND approx_cost <= :max_cost
-          {cuisine_filter}
-          {location_filter}
-          {online_filter}
-        ORDER BY name, location, rate DESC, votes DESC
-        LIMIT :limit
-    """)
+        base_conditions = [
+            "rate IS NOT NULL",
+            "approx_cost IS NOT NULL",
+            "rate >= :min_rating",
+            "approx_cost <= :max_cost"
+        ]
 
-    with engine.connect() as conn:
-        result = conn.execute(query, params)
-        rows = result.mappings().all()
+        if params.get("cuisine"):
+            base_conditions.append("cuisines ILIKE :cuisine")
+        if params.get("location"):
+            base_conditions.append("location ILIKE :location")
+        if params.get("online_order") is not None:
+            base_conditions.append("online_order = :online_order")
 
-    return {
-        "query": body.query,
-        "filters_extracted": filters,
-        "results": [dict(row) for row in rows]
-    }
+        where_clause = " AND ".join(base_conditions)
+
+        query = text(f"""
+            SELECT name, location, cuisines, rate, approx_cost, votes, online_order
+            FROM (
+                SELECT DISTINCT ON (name)
+                    name, location, cuisines, rate, approx_cost, votes, online_order
+                FROM restaurants
+                WHERE {where_clause}
+                ORDER BY name, rate DESC
+            ) deduped
+            ORDER BY rate DESC, votes DESC
+            LIMIT :limit
+        """)
+
+        with engine.connect() as conn:
+            result = conn.execute(query, params)
+            rows = result.mappings().all()
+
+        return {
+            "query": body.query,
+            "filters_extracted": filters,
+            "results": [dict(row) for row in rows]
+        }
+
+    except Exception as e:
+        error_detail = traceback.format_exc()
+        print("FULL ERROR:", error_detail)
+        return {"error": str(e), "traceback": error_detail}

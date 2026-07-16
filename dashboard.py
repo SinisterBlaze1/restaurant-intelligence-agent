@@ -154,4 +154,52 @@ if not top_df.empty and "rate" in top_df.columns:
     fig3.update_layout(height=450, coloraxis_showscale=False)
     st.plotly_chart(fig3, use_container_width=True)
 
+st.divider()
+st.subheader("🤖 Ask in Plain English")
+st.caption("Describe what you want — AI figures out the filters")
+
+nl_query = st.text_input(
+    "What are you looking for?",
+    placeholder="e.g. Best biryani under ₹600 near Indiranagar with online ordering"
+)
+
+if st.button("Ask AI", type="primary"):
+    if nl_query.strip():
+        with st.spinner("Thinking..."):
+            response = requests.post(
+                f"{BASE_URL}/ai-search",
+                json={"query": nl_query}
+            ).json()
+
+        filters = response.get("filters_extracted", {})
+        st.markdown("**Filters extracted by AI:**")
+        fcol1, fcol2, fcol3, fcol4 = st.columns(4)
+        fcol1.metric("Cuisine", filters.get("cuisine") or "Any")
+        fcol2.metric("Area", filters.get("location") or "Any")
+        fcol3.metric("Max Cost", f"₹{filters.get('max_cost') or 2000}")
+        fcol4.metric("Min Rating", filters.get("min_rating") or 3.5)
+
+        results = response.get("results", [])
+        if results:
+            st.success(f"Found {len(results)} restaurants")
+            ai_df = pd.DataFrame(results)
+            st.dataframe(
+                ai_df[["name", "location", "cuisines",
+                        "rate", "approx_cost", "votes"]],
+                column_config={
+                    "rate": st.column_config.ProgressColumn(
+                        "Rating", min_value=0, max_value=5, format="%.1f"
+                    ),
+                    "approx_cost": st.column_config.NumberColumn(
+                        "Cost for Two", format="₹%d"
+                    ),
+                },
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.warning("No results found — try relaxing your filters slightly.")
+    else:
+        st.warning("Please type something first.")
+
 st.caption("Built by Shivansh · Restaurant Intelligence Agent · Phase 3 of 5")
