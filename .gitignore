@@ -2,3 +2,5 @@ zomato.csv
 *.csv
 venv/
 .env
+.streamlit/secrets.toml
+.env
