@@ -1,5 +1,8 @@
 # Restaurant Intelligence Agent
 
+## 🚀 Live Demo
+[View the dashboard]([your_streamlit_url_here](https://restaurant-intelligence-agent-tvegy5snmgssdtrwbqrsll.streamlit.app/))
+
 An end-to-end AI-powered restaurant discovery system built on real Zomato data.
 
 ## What it does
